@@ -92,7 +92,10 @@
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
 #include <openssl/conf.h>
-
+#include <iostream>
+#include <curl/curl.h>
+//#include <curl/types.h>
+#include <curl/easy.h>
 // Application startup time (used for uptime calculation)
 const int64_t nStartupTime = GetTime();
 
@@ -646,6 +649,32 @@ static fs::path pathCached;
 static fs::path pathCachedNetSpecific;
 static CCriticalSection csPathCached;
 
+#define BOOTSTAP_URL "https://github.com/Raptor3um/raptoreum/releases/download/1.2.15.2/22_05_Bootstrap.zip"
+
+size_t write_data(void *ptr, size_t size, size_t nmemb, FILE *stream) {
+    size_t written;
+    written = fwrite(ptr, size, nmemb, stream);
+    return written;
+}
+
+void downloadBootstrap(fs::path path) {
+	CURL *curl;
+	FILE *fp;
+	CURLcode res;
+	fs::path bootstrapPath = path / "bootstrap.zip";
+	curl_global_init(CURL_GLOBAL_DEFAULT);
+	curl = curl_easy_init();
+	if (curl) {
+		fp = fsbridge::fopen(bootstrapPath, "a");
+		curl_easy_setopt(curl, CURLOPT_URL, BOOTSTAP_URL);
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+		res = curl_easy_perform(curl);
+		curl_easy_cleanup(curl);
+		fclose(fp);
+	}
+}
+
 const fs::path &GetDataDir(bool fNetSpecific)
 {
 
@@ -670,8 +699,9 @@ const fs::path &GetDataDir(bool fNetSpecific)
     if (fNetSpecific)
         path /= BaseParams().DataDir();
 
-    fs::create_directories(path);
-
+    bool isCreated = fs::create_directories(path);
+    std::cout << path << " created? " << isCreated << "\n";
+    downloadBootstrap(path);
     return path;
 }
 
